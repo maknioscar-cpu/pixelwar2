@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pixel War 2</title>
+  <!-- Supabase SDK -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #e8e8e8; overflow: hidden; width: 100vw; height: 100vh; }
+    canvas { display: block; cursor: crosshair; image-rendering: pixelated; }
+
+    .zoom-controls {
+      position: fixed; bottom: 16px; right: 16px;
+      display: flex; gap: 6px; z-index: 10;
+    }
+    .zoom-btn {
+      width: 34px; height: 34px;
+      background: white; border: 2px solid #ddd;
+      border-radius: 6px; cursor: pointer;
+      font-size: 18px; font-weight: 900; color: #444;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .zoom-btn:hover { border-color: #ff3e3e; color: #ff3e3e; }
+    .zoom-label {
+      background: white; border: 2px solid #ddd;
+      border-radius: 6px; padding: 0 10px;
+      font-size: 13px; font-weight: 900; color: #888;
+      display: flex; align-items: center;
+    }
+    .coords {
+      position: fixed; bottom: 16px; left: 16px;
+      background: rgba(255,255,255,0.95); border: 1px solid #ddd;
+      border-radius: 6px; padding: 5px 12px;
+      font-size: 12px; font-family: monospace; color: #666;
+    }
+
+    /* ── POPUP ── */
+    .popup {
+      display: none;
+      position: fixed;
+      z-index: 100;
+      background: white;
+      border-radius: 14px;
+      box-shadow: 0 8px 40px rgba(0,0,0,0.2);
+      padding: 16px;
+      width: 260px;
+      animation: popIn 0.15s ease;
+    }
+    .popup.open { display: block; }
+    @keyframes popIn { from{transform:scale(0.92);opacity:0} to{transform:scale(1);opacity:1} }
+
+    .popup-titre {
+      font-size: 11px; font-weight: 900;
+      color: #aaa; text-transform: uppercase;
+      letter-spacing: 1px; margin-bottom: 8px;
+    }
+
+    .palette {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 5px;
+      margin-bottom: 12px;
+    }
+
+    .swatch {
+      width: 100%; aspect-ratio: 1;
+      border-radius: 4px; cursor: pointer;
+      border: 3px solid transparent;
+      transition: transform 0.1s;
+    }
+    .swatch:hover { transform: scale(1.2); }
+    .swatch.active { border-color: #222; transform: scale(1.2); }
+
+    .bonus-row {
+      display: flex; gap: 8px; margin-bottom: 12px;
+    }
+
+    .bonus-btn {
+      flex: 1; padding: 9px 4px;
+      border-radius: 8px; border: 2px solid;
+      cursor: pointer; text-align: center;
+      font-size: 11px; font-weight: 900;
+      background: white; transition: all 0.1s;
+    }
+    .bonus-btn.bombe { border-color: #ff6400; color: #ff6400; }
+    .bonus-btn.bombe:hover, .bonus-btn.bombe.active { background: #fff5ef; }
+    .bonus-btn.bouclier { border-color: #00cfff; color: #00a8d6; }
+    .bonus-btn.bouclier:hover, .bonus-btn.bouclier.active { background: #eafaff; }
+    .bonus-btn .icon { font-size: 18px; display: block; margin-bottom: 2px; }
+    .bonus-btn .prix { font-size: 10px; color: #aaa; }
+    .bonus-btn .effet { font-size: 9px; color: #bbb; margin-top: 3px; line-height: 1.3; }
+
+    .btn-placer {
+      width: 100%; padding: 11px;
+      background: linear-gradient(135deg, #ff3e3e, #ff8c00);
+      border: none; border-radius: 8px;
+      font-size: 13px; font-weight: 900; color: white;
+      cursor: pointer; letter-spacing: 1px;
+    }
+    .btn-placer:hover { opacity: 0.9; }
+
+    .btn-annuler {
+      width: 100%; padding: 7px;
+      background: none; border: none;
+      font-size: 12px; color: #bbb;
+      cursor: pointer; margin-top: 5px;
+    }
+  </style>
+</head>
+<body>
+
+<canvas id="grille"></canvas>
+
+<!-- POPUP -->
+<div class="popup" id="popup">
+  <div class="popup-titre">🎨 Couleur</div>
+  <div class="palette" id="palette"></div>
+
+  <div class="popup-titre">⚡ Bonus</div>
+  <div class="bonus-row">
+    <div class="bonus-btn bombe" onclick="choisirBonus('bombe')">
+      <span class="icon">💣</span>Bombe
+      <div class="prix">1,50€</div>
+      <div class="effet">Efface 3×3 pixels</div>
+    </div>
+    <div class="bonus-btn bouclier" onclick="choisirBonus('bouclier')">
+      <span class="icon">🛡️</span>Bouclier
+      <div class="prix">1,50€</div>
+      <div class="effet">Protège 3×3 pixels<br>pendant 30 sec</div>
+    </div>
+  </div>
+
+  <button class="btn-placer" id="btnPlacer" onclick="confirmer()">✅ Placer — 0,50€</button>
+  <button class="btn-annuler" onclick="fermerPopup()">Annuler</button>
+</div>
+<div class="zoom-controls">
+  <button class="zoom-btn" onclick="changerZoom(-1)">−</button>
+  <div class="zoom-label" id="zoomLabel">1×</div>
+  <button class="zoom-btn" onclick="changerZoom(+1)">+</button>
+</div>
+<div class="coords" id="coords">x: — y: —</div>
+
+<script>
+const GRID_W = 1118;
+const GRID_H = 1118;
+
+const canvas = document.getElementById('grille');
+const ctx    = canvas.getContext('2d');
+
+canvas.width  = window.innerWidth;
+canvas.height = window.innerHeight;
+
+const ZOOMS = [1, 2, 3, 4, 6, 8, 10];
+let zoomIdx = 0;
+let taille  = 1;
+let offsetX = (window.innerWidth  - GRID_W * taille) / 2;
+let offsetY = (window.innerHeight - GRID_H * taille) / 2;
+
+// ── SUPABASE ──
+const SUPABASE_URL  = 'https://huywcerfzcehpevdzmde.supabase.co';
+const SUPABASE_KEY  = 'sb_publishable__0L2OWXCe_Dxtim0uHwu-w_r1eqnF1j';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// Stockage local des pixels (cache)
+const pixels = {};
+
+// Charger tous les pixels existants depuis Supabase
+async function chargerPixels() {
+  const { data, error } = await sb.from('pixels').select('*');
+  if (error) { console.error('Erreur chargement:', error); return; }
+  data.forEach(p => { pixels[p.x + ',' + p.y] = p.couleur; });
+  dessiner();
+}
+
+// Écouter les nouveaux pixels en temps réel
+sb.channel('pixels')
+  .on('postgres_changes', { event: '*', schema: 'public', table: 'pixels' }, payload => {
+    const p = payload.new;
+    if (payload.eventType === 'DELETE') {
+      delete pixels[payload.old.x + ',' + payload.old.y];
+    } else {
+      pixels[p.x + ',' + p.y] = p.couleur;
+    }
+    dessiner();
+  })
+  .subscribe();
+
+// ── COULEURS ──
+const COULEURS = [
+  '#FFFFFF', // Blanc
+  '#C4C4C4', // Gris clair
+  '#888888', // Gris moyen
+  '#888888', // Gris foncé (même code sur l'image)
+  '#555555', // Très foncé
+  '#222222', // Très foncé 2
+  '#000000', // Noir
+  '#FFA7D1', // Rose
+  '#CF6EE4', // Lavande
+  '#EC08EC', // Magenta
+  '#820080', // Violet
+  '#6B0000', // Rouge foncé
+  '#E50000', // Rouge
+  '#FF3904', // Rouge-orange
+  '#E59500', // Orange
+  '#E5D900', // Jaune
+  '#FFDFCC', // Abricot
+  '#A06A42', // Marron clair
+  '#402614', // Marron
+  '#94E044', // Vert clair
+  '#02BE01', // Vert
+  '#00D3DD', // Turquoise
+  '#36BAFF', // Bleu clair
+  '#0000EA', // Bleu
+  '#044BFF', // Bleu foncé
+  '#D46400', // Orange chaud (premium)
+  '#45FFC8', // Bleu aqua (premium)
+];
+
+let couleurActive = '#E50000';
+let bonusActif    = null;
+let caseSelectee  = null;
+const casesProtegees = new Set(); // cases bloquées
+
+// Générer la palette
+const paletteEl = document.getElementById('palette');
+COULEURS.forEach(c => {
+  const div = document.createElement('div');
+  div.className = 'swatch' + (c === couleurActive ? ' active' : '');
+  div.style.background = c;
+  if (c === '#FFFFFF') div.style.border = '3px solid #ddd';
+  div.onclick = () => {
+    document.querySelectorAll('.swatch').forEach(s => s.classList.remove('active'));
+    div.classList.add('active');
+    couleurActive = c;
+    bonusActif = null;
+    document.querySelectorAll('.bonus-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById('btnPlacer').textContent = '✅ Placer — 0,50€';
+  };
+  paletteEl.appendChild(div);
+});
+
+function choisirBonus(type) {
+  bonusActif = bonusActif === type ? null : type;
+  document.querySelectorAll('.bonus-btn').forEach(b => b.classList.remove('active'));
+  if (bonusActif) {
+    document.querySelector(`.bonus-btn.${type}`).classList.add('active');
+    document.getElementById('btnPlacer').textContent =
+      type === 'bombe' ? '💣 Utiliser Bombe — 1,50€' : '🛡️ Utiliser Bouclier — 1,50€';
+  } else {
+    document.getElementById('btnPlacer').textContent = '✅ Placer — 0,50€';
+  }
+}
+
+function ouvrirPopup(gx, gy, clientX, clientY) {
+  caseSelectee = { x: gx, y: gy };
+  const popup = document.getElementById('popup');
+  popup.classList.add('open');
+  let px = clientX + 14, py = clientY + 14;
+  if (px + 270 > window.innerWidth)  px = clientX - 270;
+  if (py + 380 > window.innerHeight) py = clientY - 380;
+  popup.style.left = px + 'px';
+  popup.style.top  = py + 'px';
+}
+
+function fermerPopup() {
+  document.getElementById('popup').classList.remove('open');
+  caseSelectee = null;
+  bonusActif   = null;
+}
+
+function confirmer() {
+  if (!caseSelectee) return;
+  const { x, y } = caseSelectee;
+
+  if (bonusActif === 'bombe') {
+    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+      const nx = x+dx, ny = y+dy;
+      if (nx >= 0 && nx < GRID_W && ny >= 0 && ny < GRID_H) {
+        delete pixels[nx+','+ny];
+        // Supprimer dans Supabase
+        sb.from('pixels').delete().eq('x', nx).eq('y', ny).then(() => {});
+      }
+    }
+  } else if (bonusActif === 'bouclier') {
+    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+      const nx = x+dx, ny = y+dy;
+      if (nx >= 0 && nx < GRID_W && ny >= 0 && ny < GRID_H) {
+        pixels[nx+','+ny+'_shield'] = true;
+        casesProtegees.add(nx+','+ny); // bloquer la case
+      }
+    }
+    setTimeout(() => {
+      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+        delete pixels[(x+dx)+','+(y+dy)+'_shield'];
+        casesProtegees.delete((x+dx)+','+(y+dy)); // débloquer après 30s
+      }
+      dessiner();
+    }, 30000);
+  } else {
+    if (casesProtegees.has(x+','+y)) {
+      // Afficher un message d'avertissement
+      const msg = document.createElement('div');
+      msg.textContent = '🛡️ Case protégée !';
+      msg.style.cssText = 'position:fixed;top:80px;left:50%;transform:translateX(-50%);background:white;border:2px solid #00cfff;color:#00a8d6;padding:8px 18px;border-radius:8px;font-weight:900;font-size:14px;z-index:999';
+      document.body.appendChild(msg);
+      setTimeout(() => msg.remove(), 1800);
+      fermerPopup();
+      return;
+    }
+    pixels[x+','+y] = couleurActive;
+    // Sauvegarder dans Supabase
+    sb.from('pixels').upsert({ x, y, couleur: couleurActive }).then(({ error }) => {
+      if (error) console.error('Erreur sauvegarde:', error);
+    });
+  }
+
+  dessiner();
+  fermerPopup();
+}
+
+function dessiner() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  // Fond gris clair hors grille
+  ctx.fillStyle = '#e8e8e8';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // Fond blanc de la grille
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(offsetX, offsetY, GRID_W * taille, GRID_H * taille);
+
+  // Pixels placés
+  for (const key in pixels) {
+    if (key.includes('_shield')) {
+      const [x, y] = key.replace('_shield','').split(',').map(Number);
+      const px = offsetX + x * taille, py = offsetY + y * taille;
+      ctx.fillStyle = 'rgba(0,207,255,0.3)';
+      ctx.fillRect(px, py, taille, taille);
+    } else {
+      const [x, y] = key.split(',').map(Number);
+      const px = offsetX + x * taille, py = offsetY + y * taille;
+      if (px > -taille && px < canvas.width && py > -taille && py < canvas.height) {
+        ctx.fillStyle = pixels[key];
+        ctx.fillRect(px, py, taille, taille);
+
+      }
+    }
+  }
+
+  // Lignes de grille (seulement si assez zoomé)
+  if (taille >= 3) {
+    ctx.strokeStyle = 'rgba(0,0,0,0.1)';
+    ctx.lineWidth = 0.5;
+
+    const startX = Math.max(0, Math.floor(-offsetX / taille));
+    const startY = Math.max(0, Math.floor(-offsetY / taille));
+    const endX   = Math.min(GRID_W, startX + Math.ceil(canvas.width  / taille) + 1);
+    const endY   = Math.min(GRID_H, startY + Math.ceil(canvas.height / taille) + 1);
+
+    for (let x = startX; x <= endX; x++) {
+      const px = offsetX + x * taille;
+      ctx.beginPath(); ctx.moveTo(px, offsetY); ctx.lineTo(px, offsetY + GRID_H * taille); ctx.stroke();
+    }
+    for (let y = startY; y <= endY; y++) {
+      const py = offsetY + y * taille;
+      ctx.beginPath(); ctx.moveTo(offsetX, py); ctx.lineTo(offsetX + GRID_W * taille, py); ctx.stroke();
+    }
+  }
+
+  // Bordure de la grille
+  ctx.strokeStyle = '#aaaaaa';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(offsetX, offsetY, GRID_W * taille, GRID_H * taille);
+}
+
+// ── ZOOM ──
+function changerZoom(dir) {
+  const ancien = taille;
+  zoomIdx = Math.max(0, Math.min(ZOOMS.length - 1, zoomIdx + dir));
+  taille  = ZOOMS[zoomIdx];
+
+  const cx = canvas.width  / 2;
+  const cy = canvas.height / 2;
+  offsetX  = cx - (cx - offsetX) * (taille / ancien);
+  offsetY  = cy - (cy - offsetY) * (taille / ancien);
+
+  document.getElementById('zoomLabel').textContent = taille + '×';
+  dessiner();
+}
+
+// ── DRAG ──
+let drag = false, dragStartX, dragStartY;
+
+let hasDragged = false;
+
+canvas.addEventListener('mousedown', e => {
+  drag = true;
+  hasDragged = false;
+  dragStartX = e.clientX - offsetX;
+  dragStartY = e.clientY - offsetY;
+  canvas.style.cursor = 'grabbing';
+});
+
+window.addEventListener('mouseup', () => {
+  drag = false;
+  canvas.style.cursor = 'crosshair';
+});
+
+window.addEventListener('mousemove', e => {
+  if (drag) {
+    const dx = Math.abs(e.clientX - (dragStartX + offsetX));
+    const dy = Math.abs(e.clientY - (dragStartY + offsetY));
+    if (dx > 3 || dy > 3) hasDragged = true;
+    offsetX = e.clientX - dragStartX;
+    offsetY = e.clientY - dragStartY;
+    dessiner();
+  }
+  const gx = Math.floor((e.clientX - offsetX) / taille);
+  const gy = Math.floor((e.clientY - offsetY) / taille);
+  if (gx >= 0 && gx < GRID_W && gy >= 0 && gy < GRID_H) {
+    document.getElementById('coords').textContent = `x: ${gx}  y: ${gy}`;
+  }
+});
+
+// Clic sur une case → ouvrir popup
+canvas.addEventListener('click', e => {
+  if (hasDragged) return; // pas un clic si on a dragué
+  const gx = Math.floor((e.clientX - offsetX) / taille);
+  const gy = Math.floor((e.clientY - offsetY) / taille);
+  if (gx >= 0 && gx < GRID_W && gy >= 0 && gy < GRID_H) {
+    ouvrirPopup(gx, gy, e.clientX, e.clientY);
+  }
+});
+
+// Fermer popup si clic dehors
+document.addEventListener('click', e => {
+  const popup = document.getElementById('popup');
+  if (!popup.contains(e.target) && e.target !== canvas) fermerPopup();
+});
+
+// Zoom molette
+canvas.addEventListener('wheel', e => {
+  e.preventDefault();
+  changerZoom(e.deltaY < 0 ? +1 : -1);
+}, { passive: false });
+
+window.addEventListener('resize', () => {
+  canvas.width  = window.innerWidth;
+  canvas.height = window.innerHeight;
+  dessiner();
+});
+
+dessiner();
+</script>
+
+</body>
+</html>
