@@ -4,14 +4,11 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Pixel War 2</title>
-  <!-- Supabase SDK -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <!-- Stripe SDK -->
-  <script src="https://js.stripe.com/v3/"></script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { background: #e8e8e8; overflow: hidden; width: 100vw; height: 100vh; }
-    canvas { display: block; cursor: crosshair; image-rendering: pixelated; }
+    canvas { display: block; image-rendering: pixelated; }
 
     .zoom-controls {
       position: fixed; bottom: 16px; right: 16px;
@@ -38,62 +35,41 @@
       font-size: 12px; font-family: monospace; color: #666;
     }
 
-    /* ── POPUP ── */
+    /* POPUP */
     .popup {
-      display: none;
-      position: fixed;
-      z-index: 100;
-      background: white;
-      border-radius: 14px;
+      display: none; position: fixed; z-index: 100;
+      background: white; border-radius: 14px;
       box-shadow: 0 8px 40px rgba(0,0,0,0.2);
-      padding: 16px;
-      width: 260px;
-      animation: popIn 0.15s ease;
+      padding: 16px; width: 260px;
     }
     .popup.open { display: block; }
-    @keyframes popIn { from{transform:scale(0.92);opacity:0} to{transform:scale(1);opacity:1} }
-
     .popup-titre {
-      font-size: 11px; font-weight: 900;
-      color: #aaa; text-transform: uppercase;
-      letter-spacing: 1px; margin-bottom: 8px;
+      font-size: 11px; font-weight: 900; color: #aaa;
+      text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;
     }
-
     .palette {
-      display: grid;
-      grid-template-columns: repeat(6, 1fr);
-      gap: 5px;
-      margin-bottom: 12px;
+      display: grid; grid-template-columns: repeat(6, 1fr);
+      gap: 5px; margin-bottom: 12px;
     }
-
     .swatch {
-      width: 100%; aspect-ratio: 1;
-      border-radius: 4px; cursor: pointer;
-      border: 3px solid transparent;
-      transition: transform 0.1s;
+      width: 100%; aspect-ratio: 1; border-radius: 4px;
+      cursor: pointer; border: 3px solid transparent; transition: transform 0.1s;
     }
     .swatch:hover { transform: scale(1.2); }
     .swatch.active { border-color: #222; transform: scale(1.2); }
-
-    .bonus-row {
-      display: flex; gap: 8px; margin-bottom: 12px;
-    }
-
+    .bonus-row { display: flex; gap: 8px; margin-bottom: 12px; }
     .bonus-btn {
-      flex: 1; padding: 9px 4px;
-      border-radius: 8px; border: 2px solid;
-      cursor: pointer; text-align: center;
-      font-size: 11px; font-weight: 900;
+      flex: 1; padding: 9px 4px; border-radius: 8px; border: 2px solid;
+      cursor: pointer; text-align: center; font-size: 11px; font-weight: 900;
       background: white; transition: all 0.1s;
     }
     .bonus-btn.bombe { border-color: #ff6400; color: #ff6400; }
-    .bonus-btn.bombe:hover, .bonus-btn.bombe.active { background: #fff5ef; }
+    .bonus-btn.bombe:hover, .bonus-btn.bombe.actif { background: #fff5ef; }
     .bonus-btn.bouclier { border-color: #00cfff; color: #00a8d6; }
-    .bonus-btn.bouclier:hover, .bonus-btn.bouclier.active { background: #eafaff; }
+    .bonus-btn.bouclier:hover, .bonus-btn.bouclier.actif { background: #eafaff; }
     .bonus-btn .icon { font-size: 18px; display: block; margin-bottom: 2px; }
     .bonus-btn .prix { font-size: 10px; color: #aaa; }
     .bonus-btn .effet { font-size: 9px; color: #bbb; margin-top: 3px; line-height: 1.3; }
-
     .btn-placer {
       width: 100%; padding: 11px;
       background: linear-gradient(135deg, #ff3e3e, #ff8c00);
@@ -101,69 +77,9 @@
       font-size: 13px; font-weight: 900; color: white;
       cursor: pointer; letter-spacing: 1px;
     }
-    .btn-placer:hover { opacity: 0.9; }
-
     .btn-annuler {
-      width: 100%; padding: 7px;
-      background: none; border: none;
-      font-size: 12px; color: #bbb;
-      cursor: pointer; margin-top: 5px;
-    }
-
-    /* Modal paiement Stripe */
-    .modal-paiement {
-      display: none;
-      position: fixed;
-      inset: 0;
-      background: rgba(0,0,0,0.5);
-      z-index: 200;
-      align-items: center;
-      justify-content: center;
-      backdrop-filter: blur(3px);
-    }
-    .modal-paiement.open { display: flex; }
-    .modal-paiement-box {
-      background: white;
-      border-radius: 14px;
-      padding: 28px;
-      width: 340px;
-      box-shadow: 0 20px 60px rgba(0,0,0,0.2);
-      animation: popIn 0.2s ease;
-    }
-    .modal-paiement-titre {
-      font-size: 16px; font-weight: 900;
-      color: #222; margin-bottom: 6px;
-    }
-    .modal-paiement-prix {
-      font-size: 28px; font-weight: 900;
-      color: #ff8c00; margin-bottom: 20px;
-    }
-    #stripe-card-element {
-      border: 2px solid #eee;
-      border-radius: 8px;
-      padding: 12px;
-      margin-bottom: 16px;
-    }
-    .btn-payer-stripe {
-      width: 100%; padding: 13px;
-      background: linear-gradient(135deg, #635bff, #4f46e5);
-      border: none; border-radius: 8px;
-      font-size: 14px; font-weight: 900;
-      color: white; cursor: pointer;
-      letter-spacing: 1px;
-      display: flex; align-items: center;
-      justify-content: center; gap: 8px;
-    }
-    .btn-payer-stripe:hover { opacity: 0.9; }
-    .btn-annuler-paiement {
-      width: 100%; padding: 8px;
-      background: none; border: none;
-      font-size: 12px; color: #bbb;
-      cursor: pointer; margin-top: 6px;
-    }
-    .erreur-paiement {
-      color: #ff3e3e; font-size: 12px;
-      margin-bottom: 10px; display: none;
+      width: 100%; padding: 7px; background: none; border: none;
+      font-size: 12px; color: #bbb; cursor: pointer; margin-top: 5px;
     }
   </style>
 </head>
@@ -171,11 +87,9 @@
 
 <canvas id="grille"></canvas>
 
-<!-- POPUP -->
 <div class="popup" id="popup">
   <div class="popup-titre">🎨 Couleur</div>
   <div class="palette" id="palette"></div>
-
   <div class="popup-titre">⚡ Bonus</div>
   <div class="bonus-row">
     <div class="bonus-btn bombe" onclick="choisirBonus('bombe')">
@@ -189,199 +103,114 @@
       <div class="effet">Protège 3×3 pixels<br>pendant 30 sec</div>
     </div>
   </div>
-
   <button class="btn-placer" id="btnPlacer" onclick="confirmer()">✅ Placer — 0,50€</button>
   <button class="btn-annuler" onclick="fermerPopup()">Annuler</button>
 </div>
+
 <div class="zoom-controls">
   <button class="zoom-btn" onclick="changerZoom(-1)">−</button>
-  <div class="zoom-label" id="zoomLabel">1×</div>
+  <div class="zoom-label" id="zoomLabel">2×</div>
   <button class="zoom-btn" onclick="changerZoom(+1)">+</button>
 </div>
 <div class="coords" id="coords">x: — y: —</div>
 
 <script>
+// ── SUPABASE ──
+const SUPABASE_URL = 'https://huywcerfzcehpevdzmde.supabase.co';
+const SUPABASE_KEY = 'sb_publishable__0L2OWXCe_Dxtim0uHwu-w_r1eqnF1j';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// ── CONFIG ──
 const GRID_W = 1415;
 const GRID_H = 1415;
+const ZOOMS  = [1, 2, 3, 4, 6, 8, 10];
+let zoomIdx  = 1;
+let taille   = ZOOMS[zoomIdx];
 
 const canvas = document.getElementById('grille');
 const ctx    = canvas.getContext('2d');
-
 canvas.width  = window.innerWidth;
 canvas.height = window.innerHeight;
 
-const ZOOMS = [1, 2, 3, 4, 6, 8, 10];
-let zoomIdx = 0;
-let taille  = 1;
-let offsetX = (window.innerWidth  - GRID_W * taille) / 2;
-let offsetY = (window.innerHeight - GRID_H * taille) / 2;
+let offsetX = (canvas.width  - GRID_W * taille) / 2;
+let offsetY = (canvas.height - GRID_H * taille) / 2;
 
-// ── SUPABASE ──
-const SUPABASE_URL  = 'https://huywcerfzcehpevdzmde.supabase.co';
-const SUPABASE_KEY  = 'sb_publishable__0L2OWXCe_Dxtim0uHwu-w_r1eqnF1j';
-const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-
-// Stockage local des pixels (cache)
 const pixels = {};
+const casesProtegees = new Set();
 
-// Charger tous les pixels existants depuis Supabase
+// ── SUPABASE : charger pixels ──
 async function chargerPixels() {
   const { data, error } = await sb.from('pixels').select('*');
-  if (error) { console.error('Erreur chargement:', error); return; }
+  if (error) { console.error(error); return; }
   data.forEach(p => { pixels[p.x + ',' + p.y] = p.couleur; });
   dessiner();
 }
 
-// Écouter les nouveaux pixels en temps réel
 sb.channel('pixels')
   .on('postgres_changes', { event: '*', schema: 'public', table: 'pixels' }, payload => {
-    const p = payload.new;
-    if (payload.eventType === 'DELETE') {
-      delete pixels[payload.old.x + ',' + payload.old.y];
-    } else {
-      pixels[p.x + ',' + p.y] = p.couleur;
-    }
+    if (payload.eventType === 'DELETE') delete pixels[payload.old.x+','+payload.old.y];
+    else pixels[payload.new.x+','+payload.new.y] = payload.new.couleur;
     dessiner();
   })
   .subscribe();
 
-// ── STRIPE ──
-const stripe = Stripe('pk_test_51TLMUZLw8yEf800HGe2j26b8vRYTXMAqt7rZ9K2DTW1DAujrLqLsDJoxQOfcgUJfjHT4zs3SMECmtfdoSedqBOXP00FEpChp8i');
-const elements = stripe.elements();
-const cardElement = elements.create('card', {
-  style: {
-    base: { fontSize: '16px', color: '#222', '::placeholder': { color: '#aaa' } }
-  }
-});
-cardElement.mount('#stripe-card-element');
+// ── DESSIN ──
+function dessiner() {
+  ctx.fillStyle = '#e8e8e8';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-let actionEnAttente = null; // { type: 'pixel'|'bombe'|'bouclier', x, y, couleur }
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(offsetX, offsetY, GRID_W * taille, GRID_H * taille);
 
-function ouvrirPaiement(type, x, y, couleur, montant, label) {
-  actionEnAttente = { type, x, y, couleur };
-  document.getElementById('paiementTitre').textContent = label;
-  document.getElementById('paiementPrix').textContent = montant;
-  document.getElementById('erreurPaiement').style.display = 'none';
-  document.getElementById('modalPaiement').classList.add('open');
-}
-
-function fermerModalPaiement() {
-  document.getElementById('modalPaiement').classList.remove('open');
-  actionEnAttente = null;
-}
-
-async function payerStripe() {
-  const btn = document.querySelector('.btn-payer-stripe');
-  btn.textContent = '⏳ Traitement...';
-  btn.disabled = true;
-
-  const { paymentMethod, error } = await stripe.createPaymentMethod({
-    type: 'card',
-    card: cardElement,
-  });
-
-  if (error) {
-    document.getElementById('erreurPaiement').textContent = error.message;
-    document.getElementById('erreurPaiement').style.display = 'block';
-    btn.textContent = '💳 Payer maintenant';
-    btn.disabled = false;
-    return;
+  for (const key in pixels) {
+    const [x, y] = key.split(',').map(Number);
+    const px = offsetX + x * taille;
+    const py = offsetY + y * taille;
+    if (px > -taille && px < canvas.width && py > -taille && py < canvas.height) {
+      ctx.fillStyle = pixels[key];
+      ctx.fillRect(px, py, taille, taille);
+    }
   }
 
-  // Paiement accepté — exécuter l'action
-  executerAction();
-  fermerModalPaiement();
-  btn.textContent = '💳 Payer maintenant';
-  btn.disabled = false;
-}
-
-function executerAction() {
-  if (!actionEnAttente) return;
-  const { type, x, y, couleur } = actionEnAttente;
-
-  if (type === 'pixel') {
-    if (casesProtegees.has(x+','+y)) {
-      afficherMsg('🛡️ Case protégée !', '#00cfff');
-      return;
-    }
-    pixels[x+','+y] = couleur;
-    sb.from('pixels').upsert({ x, y, couleur }).then(({ error }) => {
-      if (error) console.error(error);
-    });
-  } else if (type === 'bombe') {
-    for (let dy=-1; dy<=1; dy++) for (let dx=-1; dx<=1; dx++) {
-      const nx=x+dx, ny=y+dy;
-      if (nx>=0&&nx<GRID_W&&ny>=0&&ny<GRID_H) {
-        delete pixels[nx+','+ny];
-        sb.from('pixels').delete().eq('x',nx).eq('y',ny).then(()=>{});
-      }
-    }
-  } else if (type === 'bouclier') {
-    for (let dy=-1; dy<=1; dy++) for (let dx=-1; dx<=1; dx++) {
-      const nx=x+dx, ny=y+dy;
-      if (nx>=0&&nx<GRID_W&&ny>=0&&ny<GRID_H) {
-        pixels[nx+','+ny+'_shield'] = true;
-        casesProtegees.add(nx+','+ny);
-      }
-    }
-    setTimeout(() => {
-      for (let dy=-1; dy<=1; dy++) for (let dx=-1; dx<=1; dx++) {
-        delete pixels[(x+dx)+','+(y+dy)+'_shield'];
-        casesProtegees.delete((x+dx)+','+(y+dy));
-      }
-      dessiner();
-    }, 30000);
+  // Zones protégées
+  for (const key of casesProtegees) {
+    const [x, y] = key.split(',').map(Number);
+    ctx.fillStyle = 'rgba(0,207,255,0.3)';
+    ctx.fillRect(offsetX + x*taille, offsetY + y*taille, taille, taille);
   }
 
-  dessiner();
-  fermerPopup();
-}
+  if (taille >= 3) {
+    ctx.strokeStyle = 'rgba(0,0,0,0.08)';
+    ctx.lineWidth = 0.5;
+    const sx = Math.max(0, Math.floor(-offsetX/taille));
+    const sy = Math.max(0, Math.floor(-offsetY/taille));
+    const ex = Math.min(GRID_W, sx + Math.ceil(canvas.width/taille) + 1);
+    const ey = Math.min(GRID_H, sy + Math.ceil(canvas.height/taille) + 1);
+    for (let x = sx; x <= ex; x++) {
+      ctx.beginPath(); ctx.moveTo(offsetX+x*taille, offsetY); ctx.lineTo(offsetX+x*taille, offsetY+GRID_H*taille); ctx.stroke();
+    }
+    for (let y = sy; y <= ey; y++) {
+      ctx.beginPath(); ctx.moveTo(offsetX, offsetY+y*taille); ctx.lineTo(offsetX+GRID_W*taille, offsetY+y*taille); ctx.stroke();
+    }
+  }
 
-function afficherMsg(msg, couleur) {
-  const el = document.createElement('div');
-  el.textContent = msg;
-  el.style.cssText = `position:fixed;top:80px;left:50%;transform:translateX(-50%);background:white;border:2px solid ${couleur};color:${couleur};padding:8px 18px;border-radius:8px;font-weight:900;font-size:14px;z-index:999`;
-  document.body.appendChild(el);
-  setTimeout(() => el.remove(), 1800);
+  ctx.strokeStyle = '#aaa'; ctx.lineWidth = 2;
+  ctx.strokeRect(offsetX, offsetY, GRID_W*taille, GRID_H*taille);
 }
 
 // ── COULEURS ──
 const COULEURS = [
-  '#FFFFFF', // Blanc
-  '#C4C4C4', // Gris clair
-  '#888888', // Gris moyen
-  '#888888', // Gris foncé (même code sur l'image)
-  '#555555', // Très foncé
-  '#222222', // Très foncé 2
-  '#000000', // Noir
-  '#FFA7D1', // Rose
-  '#CF6EE4', // Lavande
-  '#EC08EC', // Magenta
-  '#820080', // Violet
-  '#6B0000', // Rouge foncé
-  '#E50000', // Rouge
-  '#FF3904', // Rouge-orange
-  '#E59500', // Orange
-  '#E5D900', // Jaune
-  '#FFDFCC', // Abricot
-  '#A06A42', // Marron clair
-  '#402614', // Marron
-  '#94E044', // Vert clair
-  '#02BE01', // Vert
-  '#00D3DD', // Turquoise
-  '#36BAFF', // Bleu clair
-  '#0000EA', // Bleu
-  '#044BFF', // Bleu foncé
-  '#D46400', // Orange chaud (premium)
-  '#45FFC8', // Bleu aqua (premium)
+  '#FFFFFF','#C4C4C4','#888888','#555555','#222222','#000000',
+  '#FFA7D1','#CF6EE4','#EC08EC','#820080','#6B0000','#E50000',
+  '#FF3904','#E59500','#E5D900','#FFDFCC','#A06A42','#402614',
+  '#94E044','#02BE01','#00D3DD','#36BAFF','#0000EA','#044BFF',
+  '#D46400','#45FFC8',
 ];
 
 let couleurActive = '#E50000';
 let bonusActif    = null;
 let caseSelectee  = null;
-const casesProtegees = new Set(); // cases bloquées
 
-// Générer la palette
 const paletteEl = document.getElementById('palette');
 COULEURS.forEach(c => {
   const div = document.createElement('div');
@@ -393,7 +222,7 @@ COULEURS.forEach(c => {
     div.classList.add('active');
     couleurActive = c;
     bonusActif = null;
-    document.querySelectorAll('.bonus-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.bonus-btn').forEach(b => b.classList.remove('actif'));
     document.getElementById('btnPlacer').textContent = '✅ Placer — 0,50€';
   };
   paletteEl.appendChild(div);
@@ -401,9 +230,9 @@ COULEURS.forEach(c => {
 
 function choisirBonus(type) {
   bonusActif = bonusActif === type ? null : type;
-  document.querySelectorAll('.bonus-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.bonus-btn').forEach(b => b.classList.remove('actif'));
   if (bonusActif) {
-    document.querySelector(`.bonus-btn.${type}`).classList.add('active');
+    document.querySelector('.bonus-btn.'+type).classList.add('actif');
     document.getElementById('btnPlacer').textContent =
       type === 'bombe' ? '💣 Utiliser Bombe — 1,50€' : '🛡️ Utiliser Bouclier — 1,50€';
   } else {
@@ -411,8 +240,13 @@ function choisirBonus(type) {
   }
 }
 
+// ── POPUP ──
 function ouvrirPopup(gx, gy, clientX, clientY) {
   caseSelectee = { x: gx, y: gy };
+  bonusActif   = null;
+  document.querySelectorAll('.bonus-btn').forEach(b => b.classList.remove('actif'));
+  document.getElementById('btnPlacer').textContent = '✅ Placer — 0,50€';
+
   const popup = document.getElementById('popup');
   popup.classList.add('open');
   let px = clientX + 14, py = clientY + 14;
@@ -433,44 +267,33 @@ function confirmer() {
   const { x, y } = caseSelectee;
 
   if (bonusActif === 'bombe') {
-    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
-      const nx = x+dx, ny = y+dy;
-      if (nx >= 0 && nx < GRID_W && ny >= 0 && ny < GRID_H) {
+    for (let dy=-1; dy<=1; dy++) for (let dx=-1; dx<=1; dx++) {
+      const nx=x+dx, ny=y+dy;
+      if (nx>=0&&nx<GRID_W&&ny>=0&&ny<GRID_H) {
         delete pixels[nx+','+ny];
-        // Supprimer dans Supabase
-        sb.from('pixels').delete().eq('x', nx).eq('y', ny).then(() => {});
+        sb.from('pixels').delete().eq('x',nx).eq('y',ny).then(()=>{});
       }
     }
   } else if (bonusActif === 'bouclier') {
-    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
-      const nx = x+dx, ny = y+dy;
-      if (nx >= 0 && nx < GRID_W && ny >= 0 && ny < GRID_H) {
-        pixels[nx+','+ny+'_shield'] = true;
-        casesProtegees.add(nx+','+ny); // bloquer la case
-      }
+    const exp = Date.now() + 30000;
+    for (let dy=-1; dy<=1; dy++) for (let dx=-1; dx<=1; dx++) {
+      const nx=x+dx, ny=y+dy;
+      if (nx>=0&&nx<GRID_W&&ny>=0&&ny<GRID_H) casesProtegees.add(nx+','+ny);
     }
     setTimeout(() => {
-      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
-        delete pixels[(x+dx)+','+(y+dy)+'_shield'];
-        casesProtegees.delete((x+dx)+','+(y+dy)); // débloquer après 30s
-      }
+      for (let dy=-1; dy<=1; dy++) for (let dx=-1; dx<=1; dx++)
+        casesProtegees.delete((x+dx)+','+(y+dy));
       dessiner();
     }, 30000);
-  } else {
+  } else if (couleurActive) {
     if (casesProtegees.has(x+','+y)) {
-      // Afficher un message d'avertissement
-      const msg = document.createElement('div');
-      msg.textContent = '🛡️ Case protégée !';
-      msg.style.cssText = 'position:fixed;top:80px;left:50%;transform:translateX(-50%);background:white;border:2px solid #00cfff;color:#00a8d6;padding:8px 18px;border-radius:8px;font-weight:900;font-size:14px;z-index:999';
-      document.body.appendChild(msg);
-      setTimeout(() => msg.remove(), 1800);
+      afficherMsg('🛡️ Case protégée !', '#00cfff');
       fermerPopup();
       return;
     }
     pixels[x+','+y] = couleurActive;
-    // Sauvegarder dans Supabase
     sb.from('pixels').upsert({ x, y, couleur: couleurActive }).then(({ error }) => {
-      if (error) console.error('Erreur sauvegarde:', error);
+      if (error) console.error(error);
     });
   }
 
@@ -478,90 +301,32 @@ function confirmer() {
   fermerPopup();
 }
 
-function dessiner() {
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-  // Fond gris clair hors grille
-  ctx.fillStyle = '#e8e8e8';
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-  // Fond blanc de la grille
-  ctx.fillStyle = '#ffffff';
-  ctx.fillRect(offsetX, offsetY, GRID_W * taille, GRID_H * taille);
-
-  // Pixels placés
-  for (const key in pixels) {
-    if (key.includes('_shield')) {
-      const [x, y] = key.replace('_shield','').split(',').map(Number);
-      const px = offsetX + x * taille, py = offsetY + y * taille;
-      ctx.fillStyle = 'rgba(0,207,255,0.3)';
-      ctx.fillRect(px, py, taille, taille);
-    } else {
-      const [x, y] = key.split(',').map(Number);
-      const px = offsetX + x * taille, py = offsetY + y * taille;
-      if (px > -taille && px < canvas.width && py > -taille && py < canvas.height) {
-        ctx.fillStyle = pixels[key];
-        ctx.fillRect(px, py, taille, taille);
-
-      }
-    }
-  }
-
-  // Lignes de grille (seulement si assez zoomé)
-  if (taille >= 3) {
-    ctx.strokeStyle = 'rgba(0,0,0,0.1)';
-    ctx.lineWidth = 0.5;
-
-    const startX = Math.max(0, Math.floor(-offsetX / taille));
-    const startY = Math.max(0, Math.floor(-offsetY / taille));
-    const endX   = Math.min(GRID_W, startX + Math.ceil(canvas.width  / taille) + 1);
-    const endY   = Math.min(GRID_H, startY + Math.ceil(canvas.height / taille) + 1);
-
-    for (let x = startX; x <= endX; x++) {
-      const px = offsetX + x * taille;
-      ctx.beginPath(); ctx.moveTo(px, offsetY); ctx.lineTo(px, offsetY + GRID_H * taille); ctx.stroke();
-    }
-    for (let y = startY; y <= endY; y++) {
-      const py = offsetY + y * taille;
-      ctx.beginPath(); ctx.moveTo(offsetX, py); ctx.lineTo(offsetX + GRID_W * taille, py); ctx.stroke();
-    }
-  }
-
-  // Bordure de la grille
-  ctx.strokeStyle = '#aaaaaa';
-  ctx.lineWidth = 2;
-  ctx.strokeRect(offsetX, offsetY, GRID_W * taille, GRID_H * taille);
+function afficherMsg(msg, couleur) {
+  const el = document.createElement('div');
+  el.textContent = msg;
+  el.style.cssText = `position:fixed;top:80px;left:50%;transform:translateX(-50%);background:white;border:2px solid ${couleur};color:${couleur};padding:8px 18px;border-radius:8px;font-weight:900;font-size:14px;z-index:999`;
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 1800);
 }
 
-// ── ZOOM ──
-function changerZoom(dir) {
-  const ancien = taille;
-  zoomIdx = Math.max(0, Math.min(ZOOMS.length - 1, zoomIdx + dir));
-  taille  = ZOOMS[zoomIdx];
-
-  const cx = canvas.width  / 2;
-  const cy = canvas.height / 2;
-  offsetX  = cx - (cx - offsetX) * (taille / ancien);
-  offsetY  = cy - (cy - offsetY) * (taille / ancien);
-
-  document.getElementById('zoomLabel').textContent = taille + '×';
-  dessiner();
-}
-
-// ── DRAG ──
-let drag = false, dragStartX, dragStartY;
-
-let hasDragged = false;
+// ── INTERACTIONS ──
+let drag = false, hasDragged = false, dragStartX, dragStartY;
 
 canvas.addEventListener('mousedown', e => {
-  drag = true;
-  hasDragged = false;
+  drag = true; hasDragged = false;
   dragStartX = e.clientX - offsetX;
   dragStartY = e.clientY - offsetY;
   canvas.style.cursor = 'grabbing';
 });
 
-window.addEventListener('mouseup', () => {
+window.addEventListener('mouseup', e => {
+  if (!hasDragged && drag) {
+    const gx = Math.floor((e.clientX - offsetX) / taille);
+    const gy = Math.floor((e.clientY - offsetY) / taille);
+    if (gx >= 0 && gx < GRID_W && gy >= 0 && gy < GRID_H) {
+      ouvrirPopup(gx, gy, e.clientX, e.clientY);
+    }
+  }
   drag = false;
   canvas.style.cursor = 'crosshair';
 });
@@ -570,39 +335,46 @@ window.addEventListener('mousemove', e => {
   if (drag) {
     const dx = Math.abs(e.clientX - (dragStartX + offsetX));
     const dy = Math.abs(e.clientY - (dragStartY + offsetY));
-    if (dx > 3 || dy > 3) hasDragged = true;
+    if (dx > 4 || dy > 4) hasDragged = true;
     offsetX = e.clientX - dragStartX;
     offsetY = e.clientY - dragStartY;
     dessiner();
   }
   const gx = Math.floor((e.clientX - offsetX) / taille);
   const gy = Math.floor((e.clientY - offsetY) / taille);
-  if (gx >= 0 && gx < GRID_W && gy >= 0 && gy < GRID_H) {
+  if (gx >= 0 && gx < GRID_W && gy >= 0 && gy < GRID_H)
     document.getElementById('coords').textContent = `x: ${gx}  y: ${gy}`;
-  }
-});
-
-// Clic sur une case → ouvrir popup
-canvas.addEventListener('click', e => {
-  if (hasDragged) return; // pas un clic si on a dragué
-  const gx = Math.floor((e.clientX - offsetX) / taille);
-  const gy = Math.floor((e.clientY - offsetY) / taille);
-  if (gx >= 0 && gx < GRID_W && gy >= 0 && gy < GRID_H) {
-    ouvrirPopup(gx, gy, e.clientX, e.clientY);
-  }
 });
 
 // Fermer popup si clic dehors
-document.addEventListener('click', e => {
+document.addEventListener('mousedown', e => {
   const popup = document.getElementById('popup');
-  if (!popup.contains(e.target) && e.target !== canvas) fermerPopup();
+  if (popup.classList.contains('open') && !popup.contains(e.target) && e.target !== canvas)
+    fermerPopup();
 });
 
-// Zoom molette
 canvas.addEventListener('wheel', e => {
   e.preventDefault();
-  changerZoom(e.deltaY < 0 ? +1 : -1);
+  const ancien = taille;
+  zoomIdx = Math.max(0, Math.min(ZOOMS.length-1, zoomIdx + (e.deltaY < 0 ? 1 : -1)));
+  taille  = ZOOMS[zoomIdx];
+  const cx = canvas.width/2, cy = canvas.height/2;
+  offsetX = cx - (cx - offsetX) * (taille/ancien);
+  offsetY = cy - (cy - offsetY) * (taille/ancien);
+  document.getElementById('zoomLabel').textContent = taille + '×';
+  dessiner();
 }, { passive: false });
+
+function changerZoom(dir) {
+  const ancien = taille;
+  zoomIdx = Math.max(0, Math.min(ZOOMS.length-1, zoomIdx+dir));
+  taille  = ZOOMS[zoomIdx];
+  const cx = canvas.width/2, cy = canvas.height/2;
+  offsetX = cx - (cx-offsetX)*(taille/ancien);
+  offsetY = cy - (cy-offsetY)*(taille/ancien);
+  document.getElementById('zoomLabel').textContent = taille+'×';
+  dessiner();
+}
 
 window.addEventListener('resize', () => {
   canvas.width  = window.innerWidth;
@@ -610,8 +382,8 @@ window.addEventListener('resize', () => {
   dessiner();
 });
 
-dessiner();
+canvas.style.cursor = 'crosshair';
+chargerPixels();
 </script>
-
 </body>
 </html>
