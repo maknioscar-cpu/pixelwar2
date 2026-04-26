@@ -9,7 +9,7 @@
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { background: #e8e8e8; overflow: hidden; width: 100vw; height: 100vh; }
     canvas { display: block; image-rendering: pixelated; }
-
+ 
     .zoom-controls {
       position: fixed; bottom: 16px; right: 16px;
       display: flex; gap: 6px; z-index: 10;
@@ -34,7 +34,7 @@
       border-radius: 6px; padding: 5px 12px;
       font-size: 12px; font-family: monospace; color: #666;
     }
-
+ 
     /* POPUP */
     .popup {
       display: none; position: fixed; z-index: 100;
@@ -84,9 +84,9 @@
   </style>
 </head>
 <body>
-
+ 
 <canvas id="grille"></canvas>
-
+ 
 <div class="popup" id="popup">
   <div class="popup-titre">🎨 Couleur</div>
   <div class="palette" id="palette"></div>
@@ -103,41 +103,41 @@
       <div class="effet">Protège 3×3 pixels<br>pendant 30 sec</div>
     </div>
   </div>
-  <button class="btn-placer" id="btnPlacer" onclick="confirmer()">✅ Placer — 0,50€</button>
+  <button class="btn-placer" id="btnPlacer" onclick="confirmer()">✅ Placer — 0,25€</button>
   <button class="btn-annuler" onclick="fermerPopup()">Annuler</button>
 </div>
-
+ 
 <div class="zoom-controls">
   <button class="zoom-btn" onclick="changerZoom(-1)">−</button>
   <div class="zoom-label" id="zoomLabel">2×</div>
   <button class="zoom-btn" onclick="changerZoom(+1)">+</button>
 </div>
 <div class="coords" id="coords">x: — y: —</div>
-
+ 
 <script>
 // ── SUPABASE ──
 const SUPABASE_URL = 'https://huywcerfzcehpevdzmde.supabase.co';
 const SUPABASE_KEY = 'sb_publishable__0L2OWXCe_Dxtim0uHwu-w_r1eqnF1j';
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-
+ 
 // ── CONFIG ──
 const GRID_W = 1415;
 const GRID_H = 1415;
 const ZOOMS  = [1, 2, 3, 4, 6, 8, 10];
 let zoomIdx  = 1;
 let taille   = ZOOMS[zoomIdx];
-
+ 
 const canvas = document.getElementById('grille');
 const ctx    = canvas.getContext('2d');
 canvas.width  = window.innerWidth;
 canvas.height = window.innerHeight;
-
+ 
 let offsetX = (canvas.width  - GRID_W * taille) / 2;
 let offsetY = (canvas.height - GRID_H * taille) / 2;
-
+ 
 const pixels = {};
 const casesProtegees = new Set();
-
+ 
 // ── SUPABASE : charger pixels ──
 async function chargerPixels() {
   const { data, error } = await sb.from('pixels').select('*');
@@ -145,7 +145,7 @@ async function chargerPixels() {
   data.forEach(p => { pixels[p.x + ',' + p.y] = p.couleur; });
   dessiner();
 }
-
+ 
 sb.channel('pixels')
   .on('postgres_changes', { event: '*', schema: 'public', table: 'pixels' }, payload => {
     if (payload.eventType === 'DELETE') delete pixels[payload.old.x+','+payload.old.y];
@@ -153,15 +153,15 @@ sb.channel('pixels')
     dessiner();
   })
   .subscribe();
-
+ 
 // ── DESSIN ──
 function dessiner() {
   ctx.fillStyle = '#e8e8e8';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
-
+ 
   ctx.fillStyle = '#ffffff';
   ctx.fillRect(offsetX, offsetY, GRID_W * taille, GRID_H * taille);
-
+ 
   for (const key in pixels) {
     const [x, y] = key.split(',').map(Number);
     const px = offsetX + x * taille;
@@ -171,14 +171,14 @@ function dessiner() {
       ctx.fillRect(px, py, taille, taille);
     }
   }
-
+ 
   // Zones protégées
   for (const key of casesProtegees) {
     const [x, y] = key.split(',').map(Number);
     ctx.fillStyle = 'rgba(0,207,255,0.3)';
     ctx.fillRect(offsetX + x*taille, offsetY + y*taille, taille, taille);
   }
-
+ 
   if (taille >= 3) {
     ctx.strokeStyle = 'rgba(0,0,0,0.08)';
     ctx.lineWidth = 0.5;
@@ -193,11 +193,11 @@ function dessiner() {
       ctx.beginPath(); ctx.moveTo(offsetX, offsetY+y*taille); ctx.lineTo(offsetX+GRID_W*taille, offsetY+y*taille); ctx.stroke();
     }
   }
-
+ 
   ctx.strokeStyle = '#aaa'; ctx.lineWidth = 2;
   ctx.strokeRect(offsetX, offsetY, GRID_W*taille, GRID_H*taille);
 }
-
+ 
 // ── COULEURS ──
 const COULEURS = [
   '#FFFFFF','#C4C4C4','#888888','#555555','#222222','#000000',
@@ -206,11 +206,11 @@ const COULEURS = [
   '#94E044','#02BE01','#00D3DD','#36BAFF','#0000EA','#044BFF',
   '#D46400','#45FFC8',
 ];
-
+ 
 let couleurActive = '#E50000';
 let bonusActif    = null;
 let caseSelectee  = null;
-
+ 
 const paletteEl = document.getElementById('palette');
 COULEURS.forEach(c => {
   const div = document.createElement('div');
@@ -223,11 +223,11 @@ COULEURS.forEach(c => {
     couleurActive = c;
     bonusActif = null;
     document.querySelectorAll('.bonus-btn').forEach(b => b.classList.remove('actif'));
-    document.getElementById('btnPlacer').textContent = '✅ Placer — 0,50€';
+    document.getElementById('btnPlacer').textContent = '✅ Placer — 0,25€';
   };
   paletteEl.appendChild(div);
 });
-
+ 
 function choisirBonus(type) {
   bonusActif = bonusActif === type ? null : type;
   document.querySelectorAll('.bonus-btn').forEach(b => b.classList.remove('actif'));
@@ -236,17 +236,17 @@ function choisirBonus(type) {
     document.getElementById('btnPlacer').textContent =
       type === 'bombe' ? '💣 Utiliser Bombe — 1,50€' : '🛡️ Utiliser Bouclier — 1,50€';
   } else {
-    document.getElementById('btnPlacer').textContent = '✅ Placer — 0,50€';
+    document.getElementById('btnPlacer').textContent = '✅ Placer — 0,25€';
   }
 }
-
+ 
 // ── POPUP ──
 function ouvrirPopup(gx, gy, clientX, clientY) {
   caseSelectee = { x: gx, y: gy };
   bonusActif   = null;
   document.querySelectorAll('.bonus-btn').forEach(b => b.classList.remove('actif'));
-  document.getElementById('btnPlacer').textContent = '✅ Placer — 0,50€';
-
+  document.getElementById('btnPlacer').textContent = '✅ Placer — 0,25€';
+ 
   const popup = document.getElementById('popup');
   popup.classList.add('open');
   let px = clientX + 14, py = clientY + 14;
@@ -255,17 +255,17 @@ function ouvrirPopup(gx, gy, clientX, clientY) {
   popup.style.left = px + 'px';
   popup.style.top  = py + 'px';
 }
-
+ 
 function fermerPopup() {
   document.getElementById('popup').classList.remove('open');
   caseSelectee = null;
   bonusActif   = null;
 }
-
+ 
 function confirmer() {
   if (!caseSelectee) return;
   const { x, y } = caseSelectee;
-
+ 
   if (bonusActif === 'bombe') {
     for (let dy=-1; dy<=1; dy++) for (let dx=-1; dx<=1; dx++) {
       const nx=x+dx, ny=y+dy;
@@ -296,11 +296,11 @@ function confirmer() {
       if (error) console.error(error);
     });
   }
-
+ 
   dessiner();
   fermerPopup();
 }
-
+ 
 function afficherMsg(msg, couleur) {
   const el = document.createElement('div');
   el.textContent = msg;
@@ -308,17 +308,17 @@ function afficherMsg(msg, couleur) {
   document.body.appendChild(el);
   setTimeout(() => el.remove(), 1800);
 }
-
+ 
 // ── INTERACTIONS ──
 let drag = false, hasDragged = false, dragStartX, dragStartY;
-
+ 
 canvas.addEventListener('mousedown', e => {
   drag = true; hasDragged = false;
   dragStartX = e.clientX - offsetX;
   dragStartY = e.clientY - offsetY;
   canvas.style.cursor = 'grabbing';
 });
-
+ 
 window.addEventListener('mouseup', e => {
   if (!hasDragged && drag) {
     const gx = Math.floor((e.clientX - offsetX) / taille);
@@ -330,7 +330,7 @@ window.addEventListener('mouseup', e => {
   drag = false;
   canvas.style.cursor = 'crosshair';
 });
-
+ 
 window.addEventListener('mousemove', e => {
   if (drag) {
     const dx = Math.abs(e.clientX - (dragStartX + offsetX));
@@ -345,14 +345,14 @@ window.addEventListener('mousemove', e => {
   if (gx >= 0 && gx < GRID_W && gy >= 0 && gy < GRID_H)
     document.getElementById('coords').textContent = `x: ${gx}  y: ${gy}`;
 });
-
+ 
 // Fermer popup si clic dehors
 document.addEventListener('mousedown', e => {
   const popup = document.getElementById('popup');
   if (popup.classList.contains('open') && !popup.contains(e.target) && e.target !== canvas)
     fermerPopup();
 });
-
+ 
 canvas.addEventListener('wheel', e => {
   e.preventDefault();
   const ancien = taille;
@@ -364,7 +364,7 @@ canvas.addEventListener('wheel', e => {
   document.getElementById('zoomLabel').textContent = taille + '×';
   dessiner();
 }, { passive: false });
-
+ 
 function changerZoom(dir) {
   const ancien = taille;
   zoomIdx = Math.max(0, Math.min(ZOOMS.length-1, zoomIdx+dir));
@@ -375,13 +375,13 @@ function changerZoom(dir) {
   document.getElementById('zoomLabel').textContent = taille+'×';
   dessiner();
 }
-
+ 
 window.addEventListener('resize', () => {
   canvas.width  = window.innerWidth;
   canvas.height = window.innerHeight;
   dessiner();
 });
-
+ 
 canvas.style.cursor = 'crosshair';
 chargerPixels();
 </script>
